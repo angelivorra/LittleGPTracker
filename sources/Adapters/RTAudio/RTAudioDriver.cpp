@@ -46,7 +46,8 @@ void RTAudioDriverThread::Notify() {
 };
 
 RTAudioDriver::RTAudioDriver(RtAudio::Api api, AudioSettings &settings)
-    : AudioDriver(settings), unalignedMain_(0), miniBlank_(0), audio_(api) {
+    : AudioDriver(settings), unalignedMain_(0), miniBlank_(0), audio_(api),
+      delayBuffer_(0), delayWritePos_(0) {
     isPlaying_ = false;
     thread_ = 0;
 };
@@ -104,6 +105,11 @@ bool RTAudioDriver::InitDriver() {
     miniBlank_ = (char *)malloc(fragSize_);
     SYS_MEMSET(miniBlank_, 0, fragSize_);
 
+    // Allocate 1-second delay ring buffer (initialized to silence)
+    delayBuffer_ = (char *)SYS_MALLOC(DELAY_BYTES);
+    SYS_MEMSET(delayBuffer_, 0, DELAY_BYTES);
+    delayWritePos_ = 0;
+
     return true;
 };
 
@@ -119,6 +125,11 @@ void RTAudioDriver::CloseDriver() {
     if (unalignedMain_) {
         SYS_FREE(unalignedMain_);
         unalignedMain_ = 0;
+    };
+
+    if (delayBuffer_) {
+        SYS_FREE(delayBuffer_);
+        delayBuffer_ = 0;
     };
 };
 
@@ -187,7 +198,21 @@ void RTAudioDriver::fillBuffer(short *stream, int frameCount) {
             thread_->Notify();
         }
     }
-    SYS_MEMCPY(stream, (short *)(mainBuffer_ + bufferPos_), len);
+    {
+        char *src = mainBuffer_ + bufferPos_;
+        char *dst = (char *)stream;
+        int remaining = DELAY_BYTES - delayWritePos_;
+        if (len <= remaining) {
+            memcpy(dst, delayBuffer_ + delayWritePos_, len);
+            memcpy(delayBuffer_ + delayWritePos_, src, len);
+        } else {
+            memcpy(dst, delayBuffer_ + delayWritePos_, remaining);
+            memcpy(dst + remaining, delayBuffer_, len - remaining);
+            memcpy(delayBuffer_ + delayWritePos_, src, remaining);
+            memcpy(delayBuffer_, src + remaining, len - remaining);
+        }
+        delayWritePos_ = (delayWritePos_ + len) % DELAY_BYTES;
+    }
     onAudioBufferTick();
     bufferPos_ += len;
 }

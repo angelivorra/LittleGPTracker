@@ -47,5 +47,9 @@ private:
   int bufferPos_ ;
   int bufferSize_ ;
   RTAudioDriverThread *thread_ ;
+  static const int DELAY_FRAMES = 44100 ; // 1 second @ 44100 Hz
+  static const int DELAY_BYTES  = DELAY_FRAMES * 4 ; // stereo 16-bit
+  char *delayBuffer_ ;
+  int   delayWritePos_ ;
 } ;
 #endif
