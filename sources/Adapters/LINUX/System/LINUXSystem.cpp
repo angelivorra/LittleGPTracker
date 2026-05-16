@@ -55,7 +55,7 @@ int LINUXSystem::MainLoop() {
  */
 void LINUXSystem::Boot(int argc,char **argv) {
 
-    SDL_setenv((char *)"SDL_VIDEO_X11_WMCLASS",(char *)"LittleGPTracker",1) ;
+    SDL_setenv((char *)"SDL_VIDEO_X11_WMCLASS",(char *)"Robotraca",1) ;
 
 	// Install System
 	System::Install(new LINUXSystem());
